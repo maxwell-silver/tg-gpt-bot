@@ -1,20 +1,30 @@
-import { Ctx, Message, On, Start, Update } from 'nestjs-telegraf'
+import { ConfigService } from '@nestjs/config'
+import { ChatgptService } from '@/chatgpt/chatgpt.service'
+import { Start, Update, Ctx, On, Message } from 'nestjs-telegraf'
 import { Scenes, Telegraf } from 'telegraf'
+import { lastValueFrom } from 'rxjs'
 
 type Context = Scenes.SceneContext
 
 @Update()
 export class TelegramService extends Telegraf<Context> {
+	constructor(
+		private readonly configService: ConfigService,
+		private readonly gpt: ChatgptService
+	) {
+		super(configService.get('TELEGRAM_API'))
+	}
 	@Start()
-	async onStart(@Ctx() ctx: Context) {
-		await ctx.replyWithHTML(`<b>Hello, ${ctx.from.username}.</b>
+	onStart(@Ctx() ctx: Context) {
+		ctx.replyWithHTML(`<b>Hello, ${ctx.from.username}</b>
 This is chatbot with ChatGPT!
-Enter any phrase and you will get answer!
-		`)
+Type any phrase and you will get an answer!
+        `)
 	}
 
 	@On('text')
 	async onMessage(@Message('text') message: string, @Ctx() ctx: Context) {
-		await ctx.replyWithHTML(`<i>${message}</i>`)
+		const text = await lastValueFrom(this.gpt.generateResponse(message))
+		await ctx.replyWithMarkdown(text)
 	}
 }
